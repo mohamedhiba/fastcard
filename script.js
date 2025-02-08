@@ -1,10 +1,12 @@
 // Firebase imports
 import { getFirestore, collection, addDoc, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { getAuth } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js';
 
 // Initialize Firebase services
 const auth = getAuth();
 const db = getFirestore();
+const storage = getStorage();
 
 // State management
 let decks = [];
@@ -52,6 +54,20 @@ function init() {
     setupEventListeners();
 }
 
+// Process and clean up LaTeX before rendering
+const processLatex = (text) => {
+    if (!text) return text;
+    
+    return text
+        // Clean up inline math
+        .replace(/\s*\$([^$]+)\$/g, ' $$$1$$ ')
+        // Clean up display math
+        .replace(/\s*\$\$([^$]+)\$\$/g, '\n$$$$1$$\n')
+        // Clean up any multiple newlines
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+};
+
 // Display current card
 function displayCard() {
     const currentDeck = decks[currentDeckIndex];
@@ -63,15 +79,19 @@ function displayCard() {
 
     const currentCard = isReviewMode ? wrongCards[currentCardIndex] : currentDeck.cards[currentCardIndex];
     
-    // Display question and answer
-    elements.questionText.innerHTML = currentCard.question;
-    elements.answerText.innerHTML = currentCard.answer;
+    // Process and set the content
+    elements.questionText.innerHTML = processLatex(currentCard.question);
+    elements.answerText.innerHTML = processLatex(currentCard.answer);
     
-    // Re-render KaTeX for the new content
-    requestAnimationFrame(() => {
-        renderMathInElement(elements.questionText);
-        renderMathInElement(elements.answerText);
-    });
+    // Trigger MathJax to process the new content
+    if (window.MathJax) {
+        Promise.all([
+            MathJax.typesetPromise([elements.questionText]),
+            MathJax.typesetPromise([elements.answerText])
+        ]).catch((err) => {
+            console.error('Error rendering math:', err);
+        });
+    }
     
     elements.flashcard.classList.remove('is-flipped');
     updateProgress();
@@ -562,13 +582,55 @@ function initializeEditors() {
         plugins: [
             'advlist', 'autolink', 'lists', 'link', 'charmap',
             'searchreplace', 'visualblocks', 'code', 'fullscreen',
-            'insertdatetime', 'table', 'help', 'wordcount', 'autoresize'
+            'insertdatetime', 'table', 'help', 'wordcount', 'autoresize',
+            'image'
         ],
         toolbar: [
             'styles | bold italic underline | alignleft aligncenter alignright | bullist numlist | forecolor backcolor',
-            'latex-inline latex-block | undo redo | removeformat'
+            'latex-inline latex-block | image | undo redo | removeformat'
         ],
         toolbar_mode: 'wrap',
+        images_upload_handler: async function (blobInfo, progress) {
+            try {
+                const file = blobInfo.blob();
+                
+                // Check file size
+                if (file.size > 5 * 1024 * 1024) {
+                    throw new Error('Image size should be less than 5MB');
+                }
+
+                // Check file type
+                if (!file.type.startsWith('image/')) {
+                    throw new Error('Please upload an image file');
+                }
+
+                const fileName = `images/${auth.currentUser.uid}/${Date.now()}_${blobInfo.filename()}`;
+                const storageRef = ref(storage, fileName);
+                
+                // Upload file
+                await uploadBytes(storageRef, file);
+                
+                // Get download URL
+                const downloadURL = await getDownloadURL(storageRef);
+
+                // Return URL with additional attributes for proper display
+                return downloadURL;
+            } catch (error) {
+                console.error('Error uploading image:', error);
+                throw new Error(error.message || 'Image upload failed');
+            }
+        },
+        image_dimensions: false, // Don't show dimensions in image dialog
+        image_class_list: [
+            {title: 'None', value: ''},
+            {title: 'Responsive', value: 'img-fluid'}
+        ],
+        image_default_size: '100%',
+        automatic_uploads: true,
+        file_picker_types: 'image',
+        images_file_types: 'jpeg,jpg,png,gif',
+        images_upload_credentials: true,
+        images_reuse_filename: true,
         content_style: `
             body { 
                 font-family: Inter, system-ui, -apple-system, sans-serif;
@@ -577,6 +639,17 @@ function initializeEditors() {
                 padding: 1rem;
             }
             p { margin: 0 0 1em 0; }
+            img {
+                max-width: 100%;
+                height: auto !important;
+                display: block;
+                margin: 0.5rem auto;
+                border-radius: 8px;
+            }
+            .img-fluid {
+                max-width: 100%;
+                height: auto;
+            }
             .latex-block {
                 display: block;
                 margin: 1em 0;
@@ -586,6 +659,12 @@ function initializeEditors() {
                 border: 1px solid #e2e8f0;
             }
             .latex-inline {
+                padding: 0.2em 0.4em;
+                background: #f1f5f9;
+                border-radius: 4px;
+            }
+            .math-tex {
+                display: inline-block;
                 padding: 0.2em 0.4em;
                 background: #f1f5f9;
                 border-radius: 4px;
@@ -613,7 +692,7 @@ function initializeEditors() {
                 tooltip: 'Insert inline LaTeX equation (Ctrl+L)',
                 onAction: function() {
                     const selectedText = editor.selection.getContent() || 'x^2';
-                    editor.insertContent(`$${selectedText}$`);
+                    editor.insertContent(`<span class="math-tex">$${selectedText}$</span>`);
                 }
             });
 
@@ -623,19 +702,28 @@ function initializeEditors() {
                 tooltip: 'Insert block LaTeX equation (Ctrl+Shift+L)',
                 onAction: function() {
                     const selectedText = editor.selection.getContent() || 'f(x) = x^2';
-                    editor.insertContent(`\n$$${selectedText}$$\n`);
+                    editor.insertContent(`<div class="math-tex">$$${selectedText}$$</div>`);
                 }
             });
 
             // Add keyboard shortcuts for LaTeX
             editor.addShortcut('ctrl+l', 'Insert inline LaTeX', function() {
                 const selectedText = editor.selection.getContent() || 'x^2';
-                editor.insertContent(`$${selectedText}$`);
+                editor.insertContent(`<span class="math-tex">$${selectedText}$</span>`);
             });
             
             editor.addShortcut('ctrl+shift+l', 'Insert block LaTeX', function() {
                 const selectedText = editor.selection.getContent() || 'f(x) = x^2';
-                editor.insertContent(`\n$$${selectedText}$$\n`);
+                editor.insertContent(`<div class="math-tex">$$${selectedText}$$</div>`);
+            });
+
+            // After content is set or modified, trigger MathJax rendering
+            editor.on('SetContent Change', function() {
+                if (window.MathJax) {
+                    MathJax.typesetPromise([editor.getBody()]).catch((err) => {
+                        console.error('Error rendering math in editor:', err);
+                    });
+                }
             });
         },
         formats: {
@@ -650,7 +738,8 @@ function initializeEditors() {
         skin: 'oxide',
         content_css: 'default',
         entity_encoding: 'raw',
-        verify_html: false
+        verify_html: false,
+        extended_valid_elements: 'span[class],div[class]'
     });
 }
 
@@ -809,3 +898,103 @@ function updateCardControls() {
         controls.appendChild(deleteBtn);
     }
 }
+
+// Toggle bulk import section
+window.toggleBulkImport = function() {
+    const bulkImportSection = document.getElementById('bulkImportSection');
+    const isHidden = bulkImportSection.style.display === 'none';
+    bulkImportSection.style.display = isHidden ? 'block' : 'none';
+};
+
+// Import bulk cards
+window.importBulkCards = async function() {
+    const bulkText = document.getElementById('bulkImportText').value.trim();
+    if (!bulkText) {
+        showError('Please paste data first');
+        return;
+    }
+
+    try {
+        let cards = [];
+        // First try parsing as JSON
+        try {
+            const jsonCards = JSON.parse(bulkText);
+            if (Array.isArray(jsonCards)) {
+                cards = jsonCards.map(card => ({
+                    Question: processLatex(card.Question),
+                    Answer: processLatex(card.Answer)
+                }));
+            }
+        } catch {
+            // If JSON parsing fails, try natural format (Q; A format)
+            cards = bulkText.split('\n')
+                .filter(line => line.trim())
+                .map(line => {
+                    const firstSemicolonIndex = line.indexOf(';');
+                    if (firstSemicolonIndex === -1) return null;
+                    
+                    const question = line.substring(0, firstSemicolonIndex).trim();
+                    const answer = line.substring(firstSemicolonIndex + 1).trim();
+                    
+                    return {
+                        Question: processLatex(question),
+                        Answer: processLatex(answer)
+                    };
+                })
+                .filter(card => card !== null);
+        }
+
+        if (cards.length === 0) {
+            throw new Error('No valid cards found');
+        }
+
+        const userId = auth.currentUser.uid;
+        const currentDeck = decks[currentDeckIndex];
+        let successCount = 0;
+
+        for (const card of cards) {
+            if (!card.Question || !card.Answer) {
+                continue;
+            }
+
+            const cardData = {
+                question: card.Question,
+                answer: card.Answer,
+                category: 'General',
+                createdAt: new Date()
+            };
+
+            try {
+                // Add card to Firebase
+                const cardRef = collection(db, `users/${userId}/decks/${currentDeck.id}/cards`);
+                const docRef = await addDoc(cardRef, cardData);
+                
+                // Add to local state
+                const newCard = {
+                    id: docRef.id,
+                    ...cardData
+                };
+                currentDeck.cards.unshift(newCard);
+                successCount++;
+            } catch (error) {
+                console.error('Error adding card:', error);
+            }
+        }
+
+        // Update UI
+        currentCardIndex = 0;
+        displayCard();
+        updateProgress();
+
+        // Show success message
+        showSuccessMessage(`Successfully imported ${successCount} cards!`);
+        
+        // Clear the textarea and hide the bulk import section
+        document.getElementById('bulkImportText').value = '';
+        document.getElementById('bulkImportSection').style.display = 'none';
+        
+    } catch (error) {
+        showError('Invalid format. Please check your data.');
+        console.error('Error importing cards:', error);
+    }
+};

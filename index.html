@@ -7,10 +7,49 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <!-- Add TinyMCE -->
     <script src="https://cdn.tiny.cloud/1/9rklzsnd894o75750oghqy8g8ujkgmq7w0egi6wv1y6l5ke6/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true,
+                packages: ['base', 'ams', 'noerrors', 'noundefined']
+            },
+            options: {
+                ignoreHtmlClass: 'tex2jax_ignore',
+                processHtmlClass: 'tex2jax_process',
+                renderActions: {
+                    findScript: [10, function (doc) {
+                        document.querySelectorAll('script[type^="math/tex"]').forEach(function(node) {
+                            const display = !!node.type.match(/; *mode=display/);
+                            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+                            const text = document.createTextNode('');
+                            node.parentNode.replaceChild(text, node);
+                            math.start = {node: text, delim: '', n: 0};
+                            math.end = {node: text, delim: '', n: 0};
+                            doc.math.push(math);
+                        });
+                    }, '']
+                }
+            },
+            chtml: {
+                scale: 1,
+                minScale: .5,
+                matchFontHeight: true,
+                mtextInheritFont: true
+            },
+            startup: {
+                ready: () => {
+                    MathJax.startup.defaultReady();
+                }
+            }
+        };
+    </script>
     
     <!-- Firebase SDK -->
     <script type="module">
@@ -292,6 +331,30 @@
                         <option value="Geography">Geography</option>
                         <option value="Language">Language</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <button onclick="toggleBulkImport()" class="btn btn-secondary bulk-import-toggle">
+                        <i class="fas fa-file-import"></i>
+                        <span>Bulk Import from JSON or Natural Format</span>
+                    </button>
+                    <div id="bulkImportSection" style="display: none;">
+                        <textarea id="bulkImportText" class="bulk-import-textarea" placeholder='You can use either format:
+
+1. JSON Format:
+[
+    {"Question": "Your question here", "Answer": "Your answer here"},
+    {"Question": "Another question", "Answer": "Another answer"}
+]
+
+2. Natural Format (one card per line, separated by semicolon):
+What is X?; X is Y.
+What is the formula?; The formula is $E = mc^2$
+What is the equation?; $$f(x) = x^2$$'></textarea>
+                        <button onclick="importBulkCards()" class="btn btn-primary">
+                            <i class="fas fa-file-import"></i>
+                            <span>Import Cards</span>
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
