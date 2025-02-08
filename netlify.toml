@@ -9,6 +9,16 @@
 [build.environment]
   NODE_VERSION = "18"
 
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; img-src 'self' https: data:; font-src 'self' https: data:;"
+
 [build.processing]
   skip_processing = false
 
@@ -21,4 +31,7 @@
 
 [build.processing.js]
   bundle = true
-  minify = true 
+  minify = true
+
+[[plugins]]
+  package = "@netlify/plugin-lighthouse" 
