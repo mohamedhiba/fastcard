@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <script src="https://cdn.tiny.cloud/1/9rklzsnd894o75750oghqy8g8ujkgmq7w0egi6wv1y6l5ke6/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+    <script src="https://cdn.tiny.cloud/1/${import.meta.env.VITE_TINYMCE_API_KEY}/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
     
@@ -19,13 +19,13 @@
         import { getFirestore, collection, addDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
         const firebaseConfig = {
-            apiKey: "AIzaSyB6W24XFW4ksSk6O-xMZq2_nDew2YsGfw4",
-            authDomain: "fastcard-2ee52.firebaseapp.com",
-            projectId: "fastcard-2ee52",
-            storageBucket: "fastcard-2ee52.firebasestorage.app",
-            messagingSenderId: "472949561957",
-            appId: "1:472949561957:web:99a3b72d35432ca0e6848c",
-            measurementId: "G-0BBPHY40H7"
+            apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+            authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+            projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+            storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+            messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+            appId: import.meta.env.VITE_FIREBASE_APP_ID,
+            measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
         };
 
         // Initialize Firebase
