@@ -152,6 +152,7 @@ function nextCard() {
     
     currentCardIndex++;
     if (currentCardIndex >= cards.length) {
+        currentCardIndex = cards.length - 1; // Keep the last card visible
         showCompletionMessage();
         return;
     }
@@ -166,14 +167,28 @@ function prevCard() {
 }
 
 function markCorrect() {
+    const cards = isReviewMode ? wrongCards : decks[currentDeckIndex].cards;
+    if (cards.length === 0) return;
+    
     correctCount++;
     if (isReviewMode) {
         wrongCards.splice(currentCardIndex, 1);
+        if (wrongCards.length === 0) {
+            showCompletionMessage();
+            return;
+        }
+        // Adjust currentCardIndex if we're at the end
+        if (currentCardIndex >= wrongCards.length) {
+            currentCardIndex = wrongCards.length - 1;
+        }
     }
     nextCard();
 }
 
 function markWrong() {
+    const cards = isReviewMode ? wrongCards : decks[currentDeckIndex].cards;
+    if (cards.length === 0) return;
+    
     wrongCount++;
     const currentCard = isReviewMode ? 
         wrongCards[currentCardIndex] : 
