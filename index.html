@@ -35,15 +35,17 @@
 
         // Check authentication state
         onAuthStateChanged(auth, (user) => {
-            if (!user && window.location.pathname !== '/auth.html') {
-                // User is not logged in and not on auth page, redirect to auth page
-                window.location.href = '/auth.html';
-            } else if (user && window.location.pathname === '/auth.html') {
-                // User is logged in and on auth page, redirect to main app
-                window.location.href = '/index.html';
+            console.log('Auth state changed:', user ? 'User logged in' : 'No user');
+            if (!user && window.location.pathname !== './auth.html') {
+                console.log('Redirecting to auth page');
+                window.location.href = './auth.html';
+            } else if (user && window.location.pathname === './auth.html') {
+                console.log('Redirecting to main app');
+                window.location.href = './index.html';
             } else if (user) {
-                // User is logged in and on main app, show the content
+                console.log('Showing content');
                 document.body.style.visibility = 'visible';
+                document.getElementById('loading').style.display = 'none';
             }
         });
 
@@ -51,7 +53,7 @@
         window.logout = async () => {
             try {
                 await signOut(auth);
-                window.location.href = '/auth.html';
+                window.location.href = './auth.html';
             } catch (error) {
                 console.error('Error logging out:', error);
             }
@@ -95,6 +97,9 @@
     </script>
 </head>
 <body style="visibility: hidden">
+    <div id="loading" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5rem; color: #2563eb;">
+        Loading...
+    </div>
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
@@ -369,5 +374,12 @@
     </div>
 
     <script type="module" src="script.js"></script>
+    <script>
+        // Add this right after the body
+        document.getElementById('loading').style.display = 'block';
+        window.addEventListener('load', () => {
+            document.getElementById('loading').style.display = 'none';
+        });
+    </script>
 </body>
 </html> 
